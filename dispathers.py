@@ -83,31 +83,7 @@ async def create_table():
         await db.commit()
 
 
-@dp.callback_query(F.data[:1] == "r")
-async def right_answer(callback: types.CallbackQuery):
-    await callback.bot.edit_message_reply_markup(
-        chat_id=callback.from_user.id,
-        message_id=callback.message.message_id,
-        reply_markup=None
-    )
-
-    current_question_index = await get_data_from_db(callback.from_user.id, 'question_index')
-    current_right_answers = await get_data_from_db(callback.from_user.id, 'right_answers')
-
-    await callback.message.answer(f"Ваш ответ: {callback.data[2:]}. Верно!")
-
-    current_question_index += 1
-    current_right_answers += 1
-    await update_quiz_index(callback.from_user.id, current_question_index, current_right_answers)
-
-    if current_question_index < len(quiz_data):
-        await get_question(callback.message, callback.from_user.id)
-    else:
-        await callback.message.answer(f"Это был последний вопрос. Квиз завершен! Ваш результат: {current_right_answers} из {len(quiz_data)}")
-
-
-@dp.callback_query(F.data[:1] == "w")
-async def wrong_answer(callback: types.CallbackQuery):
+async def inner(callback, num):
     await callback.bot.edit_message_reply_markup(
         chat_id=callback.from_user.id,
         message_id=callback.message.message_id,
@@ -119,13 +95,24 @@ async def wrong_answer(callback: types.CallbackQuery):
 
     correct_option = quiz_data[current_question_index]['correct_option']
 
-    await callback.message.answer(f"Неправильно. Ваш ответ: {callback.data[2:]}. Правильный ответ: {quiz_data[current_question_index]['options'][correct_option]}")
+    await callback.message.answer(f"Ваш ответ: {callback.data[2:]}. Верно!" if num else f"Неправильно. Ваш ответ: {callback.data[2:]}. Правильный ответ: {
+        quiz_data[current_question_index]['options'][correct_option]}")
 
     current_question_index += 1
-    current_right_answers += 0
+    current_right_answers += num
     await update_quiz_index(callback.from_user.id, current_question_index, current_right_answers)
 
     if current_question_index < len(quiz_data):
         await get_question(callback.message, callback.from_user.id)
     else:
         await callback.message.answer(f"Это был последний вопрос. Квиз завершен! Ваш результат: {current_right_answers} из {len(quiz_data)}")
+
+
+@dp.callback_query(F.data[:1] == "r")
+async def right_answer(callback: types.CallbackQuery):
+    await inner(callback, 1)
+
+
+@dp.callback_query(F.data[:1] == "w")
+async def wrong_answer(callback: types.CallbackQuery):
+    await inner(callback, 0)
